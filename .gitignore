@@ -1,0 +1,5 @@
+.fitlog
+.fitconfig
+logs
+__pycache__
+venv
