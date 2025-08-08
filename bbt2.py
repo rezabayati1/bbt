@@ -751,6 +751,11 @@ class LMForwardAPI:
                         )["logits"]
 
                 dev_loss, dev_perf = self.calc_metric(logits, dev_data["labels"])
+
+                os.makedirs(f'results_{task_name}_{random_proj}', exist_ok=True)
+                output_path = f'results_{task_name}_{random_proj}/convergence_data.txt'
+                with open(output_path, 'a') as f_out:
+                    f_out.write(f"{self.num_call},{dev_loss},{dev_perf}\n")
                 # fitlog.add_metric(dev_perf, name='dev_acc', step=self.num_call)
                 if dev_perf > self.best_dev_perf:
                     self.best_dev_perf = dev_perf
