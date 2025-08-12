@@ -382,7 +382,7 @@ class LMForwardAPI:
 
         proj_output_dim = n_prompt_tokens * self.config.hidden_size
 
-        random_proj = "sparse"
+        random_proj = "normal"
 
         if random_proj == "normal":
             # calculate std for normal distribution
