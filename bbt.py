@@ -682,7 +682,7 @@ class LMForwardAPI:
             #     with open(os.path.join(self.save_path, 'train_acc.txt'), 'a') as fout:
             #         fout.write('{}\t{}\n'.format(self.num_call, perf))
             os.makedirs(f'results_{task_name}_{random_proj}_train', exist_ok=True)
-            output_path = f'results_{task_name}_{random_proj}/convergence_data_train.txt'
+            output_path = f'results_{task_name}_{random_proj}_train/convergence_data_train.txt'
             with open(output_path, 'a') as f_out:
                 f_out.write(f"{self.num_call},{loss},{perf}\n")
             if self.num_call % self.print_every == 0:
@@ -725,7 +725,7 @@ class LMForwardAPI:
 
                 dev_loss, dev_perf = self.calc_metric(logits, dev_data["labels"])
                 os.makedirs(f'results_{task_name}_{random_proj}_dev', exist_ok=True)
-                output_path = f'results_{task_name}_{random_proj}/convergence_data_dev.txt'
+                output_path = f'results_{task_name}_{random_proj}_dev/convergence_data_dev.txt'
                 with open(output_path, 'a') as f_out:
                     f_out.write(f"{self.num_call},{dev_loss},{dev_perf}\n")
                 # fitlog.add_metric(dev_perf, name='dev_acc', step=self.num_call)
