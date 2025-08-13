@@ -705,9 +705,9 @@ class LMForwardAPI:
             # fitlog.add_metric(perf, name='train_acc', step=self.num_call)
 
             os.makedirs(f'results_{task_name}_{random_proj}_train', exist_ok=True)
-                output_path = f'results_{task_name}_{random_proj}/convergence_data_train.txt'
-                with open(output_path, 'a') as f_out:
-                    f_out.write(f"{self.num_call},{loss},{perf}\n")
+            output_path = f'results_{task_name}_{random_proj}/convergence_data_train.txt'
+            with open(output_path, 'a') as f_out:
+                f_out.write(f"{self.num_call},{loss},{perf}\n")
             if perf > self.best_train_perf:
                 self.best_train_perf = perf
                 # fitlog.add_best_metric(self.best_train_perf, name='train_acc')
