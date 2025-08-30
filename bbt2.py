@@ -379,11 +379,9 @@ class LMForwardAPI:
 
         self.linear = torch.nn.Linear(
             intrinsic_dim, n_prompt_tokens * self.config.hidden_size, bias=False
-        )
+        ).to(device)
 
         proj_output_dim = n_prompt_tokens * self.config.hidden_size
-
-        random_proj = "normal"
 
         if random_proj == "normal":
             # calculate std for normal distribution
@@ -431,9 +429,7 @@ class LMForwardAPI:
                 torch.nn.init.normal_(p, mu, std)
         elif random_proj == "sparse":
             print(f"[Random Projection] Using a sparse random matrix with {0.9*100}% sparsity.")
-            self.linear = torch.nn.Linear(intrinsic_dim, proj_output_dim, bias=False).to(device)
             self._init_sparse_projection(sparsity=0.9)
-
 
         self.best_train_perf = 0.0
         self.best_dev_perf = 0.0
