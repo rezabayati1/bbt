@@ -34,6 +34,7 @@ from models.modeling_electra import ElectraForMaskedLM
 from models.modeling_cpt import CPTForMaskedLM
 from utils import hinge_loss
 from sklearn.metrics import f1_score
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -1021,19 +1022,108 @@ if parallel:
     train_data["labels"] = train_data["labels"].repeat(es.popsize)
 
 # opt = cma.CMAOptions()
-start_time = time.time()
-while not es.stop():
-    solutions = es.ask()
+
+projection_types = ["normal", "sparse"]
+results = {}
+
+for proj_type in projection_types:
+    print(f"\nRunning with {proj_type} projection...")
+    random_proj = proj_type
+
+    # Reinitialize the model forward API with the new projection type
+    model_forward_api = LMForwardAPI(
+        model_name=model_name,
+        n_prompt_tokens=n_prompt_tokens,
+        task_name=task_name,
+        loss_type=loss_type,
+        init_prompt_path=init_prompt_path,
+    )
+
+    # Reinitialize CMA-ES for each run
+    es = cma.CMAEvolutionStrategy(intrinsic_dim * [0], sigma, inopts=cma_opts)
+    print("Population Size: {}".format(es.popsize))
+    print("{} Evaluation.".format("Parallel" if parallel else "Serial"))
+
     if parallel:
-        fitnesses = model_forward_api.eval(solutions)
-    else:
-        fitnesses = [model_forward_api.eval(x) for x in solutions]
-    es.tell(solutions, fitnesses)
-    # es.logger.add()  # write data to disc to be plotted
-    # es.disp()
-end_time = time.time()
-print("Done. Elapsed time: {} (mins)".format((end_time - start_time) / 60))
-print("Evaluate on test data...")
-test_acc = model_forward_api.eval(test_data=test_data)
-print("Test acc: {}".format(round(test_acc, 4)))
+        # expand training data to a larger batch for parallel evaluation
+        train_data["input_ids"] = train_data["input_ids"].repeat(es.popsize, 1)
+        train_data["attention_mask"] = train_data["attention_mask"].repeat(es.popsize, 1)
+        if 'mask_pos' in train_data:
+            train_data['mask_pos'] = train_data['mask_pos'].repeat(es.popsize)
+        train_data["labels"] = train_data["labels"].repeat(es.popsize)
+
+    start_time = time.time()
+    while not es.stop():
+        solutions = es.ask()
+        if parallel:
+            fitnesses = model_forward_api.eval(solutions)
+        else:
+            fitnesses = [model_forward_api.eval(x) for x in solutions]
+        es.tell(solutions, fitnesses)
+        # es.logger.add()  # write data to disc to be plotted
+        # es.disp()
+    end_time = time.time()
+    elapsed_time = (end_time - start_time) / 60
+
+    print("Done. Elapsed time: {} (mins)".format(elapsed_time))
+    print("Evaluate on test data...")
+    test_acc = model_forward_api.eval(test_data=test_data)
+    print("Test acc: {}".format(round(test_acc, 4)))
+
+    results[proj_type] = {
+        'elapsed_time': elapsed_time,
+        'test_acc': test_acc,
+        'best_train_perf': model_forward_api.best_train_perf,
+        'best_dev_perf': model_forward_api.best_dev_perf
+    }
+
+# Now, print comparison
+print("\nComparison Results:")
+print("Projection Type | Elapsed Time (mins) | Test Accuracy | Best Train Perf | Best Dev Perf")
+for proj, res in results.items():
+    print(f"{proj:15} | {res['elapsed_time']:18.2f} | {res['test_acc']:12.4f} | {res['best_train_perf']:14.4f} | {res['best_dev_perf']:12.4f}")
+
+# Generate plots
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+fig.suptitle('Comparison of Normal vs Sparse Projections')
+
+# Time comparison
+axes[0,0].bar(['Normal', 'Sparse'], [results['normal']['elapsed_time'], results['sparse']['elapsed_time']])
+axes[0,0].set_title('Elapsed Time (minutes)')
+axes[0,0].set_ylabel('Time (mins)')
+
+# Test Accuracy comparison
+axes[0,1].bar(['Normal', 'Sparse'], [results['normal']['test_acc'], results['sparse']['test_acc']])
+axes[0,1].set_title('Test Accuracy')
+axes[0,1].set_ylabel('Accuracy')
+
+# Best Train Perf comparison
+axes[1,0].bar(['Normal', 'Sparse'], [results['normal']['best_train_perf'], results['sparse']['best_train_perf']])
+axes[1,0].set_title('Best Train Performance')
+axes[1,0].set_ylabel('Performance')
+
+# Best Dev Perf comparison
+axes[1,1].bar(['Normal', 'Sparse'], [results['normal']['best_dev_perf'], results['sparse']['best_dev_perf']])
+axes[1,1].set_title('Best Dev Performance')
+axes[1,1].set_ylabel('Performance')
+
+plt.tight_layout()
+plt.savefig('projection_comparison.png')
+plt.show()
+
+# Also, plot convergence if data exists
+for proj_type in projection_types:
+    conv_file = f'results_{task_name}_{proj_type}/convergence_data.txt'
+    if os.path.exists(conv_file):
+        data = np.loadtxt(conv_file, delimiter=',')
+        if data.size > 0:
+            plt.figure()
+            plt.plot(data[:, 0], data[:, 2], label=f'{proj_type} Dev Perf')
+            plt.xlabel('API Calls')
+            plt.ylabel('Dev Performance')
+            plt.title(f'Convergence for {proj_type} Projection')
+            plt.legend()
+            plt.savefig(f'convergence_{proj_type}.png')
+            plt.show()
+
 # fitlog.finish()
